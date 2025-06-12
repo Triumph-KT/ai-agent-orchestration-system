@@ -255,10 +255,12 @@ class AIOrchestrationServer {
         const stats = {
             type: 'stats_update',
             agents: this.agentManager.getStats(),
+            agentList: this.agentManager.getAllAgents(), 
             tasks: this.taskQueue.getStats(),
             timestamp: new Date()
         };
         
+        // Send to all dashboard connections
         this.wss.clients.forEach(client => {
             if (client.isDashboard && client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify(stats));

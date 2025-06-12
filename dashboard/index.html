@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Orchestrator - Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1b;
+            --card-bg: #272729;
+            --border-color: #343536;
+            --text-color: #d7dadc;
+            --text-muted: #818384;
+            --accent-color: #4f46e5;
+            --green: #2fa84d;
+            --orange: #f7b538;
+            --red: #d93a3a;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            gap: 24px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .status-light {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--red);
+            transition: background-color 0.3s ease;
+        }
+        .status-light.connected {
+            background-color: var(--green);
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 24px;
+        }
+        .metric-card {
+            background-color: var(--card-bg);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .metric-card h3 {
+            margin: 0 0 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .metric-card p {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 600;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            padding: 16px;
+        }
+        .card h2 {
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        th {
+            color: var(--text-muted);
+        }
+        .capabilities-cell {
+            white-space: normal;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+        .status-idle { background-color: var(--green); color: white; }
+        .status-busy { background-color: var(--orange); color: var(--bg-color); }
+        .status-offline { background-color: var(--red); color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Orchestrator Dashboard</h1>
+            <div class="connection-status">
+                <div id="status-light" class="status-light"></div>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h3>Total Agents</h3>
+                <p id="metric-total-agents">0</p>
+            </div>
+            <div class="metric-card">
+                <h3>Idle Agents</h3>
+                <p id="metric-idle-agents">0</p>
+            </div>
+            <div class="metric-card">
+                <h3>Busy Agents</h3>
+                <p id="metric-busy-agents">0</p>
+            </div>
+            <div class="metric-card">
+                <h3>Pending Tasks</h3>
+                <p id="metric-pending-tasks">0</p>
+            </div>
+            <div class="metric-card">
+                <h3>Completed Tasks</h3>
+                <p id="metric-completed-tasks">0</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Live Agent Status</h2>
+            <table id="agent-table">
+                <thead>
+                    <tr>
+                        <th>Agent ID</th>
+                        <th>Status</th>
+                        <th>Capabilities</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusLight = document.getElementById('status-light');
+            const statusText = document.getElementById('status-text');
+            const agentTableBody = document.querySelector('#agent-table tbody');
+
+            const metricTotalAgents = document.getElementById('metric-total-agents');
+            const metricIdleAgents = document.getElementById('metric-idle-agents');
+            const metricBusyAgents = document.getElementById('metric-busy-agents');
+            const metricPendingTasks = document.getElementById('metric-pending-tasks');
+            const metricCompletedTasks = document.getElementById('metric-completed-tasks');
+            
+            const serverUrl = 'ws://localhost:8080';
+            let ws;
+
+            function connect() {
+                ws = new WebSocket(serverUrl);
+
+                ws.onopen = () => {
+                    console.log('Connected to orchestration server');
+                    statusLight.classList.add('connected');
+                    statusText.textContent = 'Connected';
+                    ws.send(JSON.stringify({ type: 'dashboard_connect' }));
+                };
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'dashboard_init' || data.type === 'stats_update') {
+                        updateDashboard(data);
+                    }
+                };
+
+                ws.onclose = () => {
+                    console.log('Disconnected from server. Reconnecting in 3 seconds...');
+                    statusLight.classList.remove('connected');
+                    statusText.textContent = 'Disconnected';
+                    setTimeout(connect, 3000);
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    statusText.textContent = 'Error';
+                    ws.close();
+                };
+            }
+
+            function updateDashboard(data) {
+                // Update metric cards
+                if (data.agents) {
+                    metricTotalAgents.textContent = data.agents.total || 0;
+                    metricIdleAgents.textContent = data.agents.idle || 0;
+                    metricBusyAgents.textContent = data.agents.busy || 0;
+                }
+                if (data.tasks) {
+                    metricPendingTasks.textContent = data.tasks.pending || 0;
+                    metricCompletedTasks.textContent = data.tasks.completed || 0;
+                }
+                
+                // NEW LOGIC: Update agent table from the live list
+                if (data.agentList) {
+                    updateAgentTable(data.agentList);
+                } else if (data.type === 'dashboard_init' && data.agents) {
+                    // Fallback for the very first message
+                    updateAgentTable(data.agents);
+                }
+            }
+
+            function updateAgentTable(agents) {
+                agentTableBody.innerHTML = '';
+                
+                if (!agents || agents.length === 0) {
+                    const row = agentTableBody.insertRow();
+                    const cell = row.insertCell();
+                    cell.colSpan = 3;
+                    cell.textContent = 'No agents connected.';
+                    cell.style.textAlign = 'center';
+                    cell.style.color = 'var(--text-muted)';
+                    return;
+                }
+
+                agents.forEach(agent => {
+                    const row = agentTableBody.insertRow();
+                    
+                    const idCell = row.insertCell();
+                    idCell.textContent = agent.id.substring(0, 8);
+
+                    const statusCell = row.insertCell();
+                    const statusSpan = document.createElement('span');
+                    statusSpan.className = `status status-${agent.status}`;
+                    statusSpan.textContent = agent.status;
+                    statusCell.appendChild(statusSpan);
+
+                    const capsCell = row.insertCell();
+                    capsCell.className = 'capabilities-cell';
+                    capsCell.textContent = agent.capabilities.join(', ');
+                });
+            }
+            
+            connect();
+        });
+    </script>
+</body>
+</html>
