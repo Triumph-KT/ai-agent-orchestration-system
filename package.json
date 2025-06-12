@@ -1,0 +1,15 @@
+{
+  "name": "ai-agent-orchestrator",
+  "version": "1.0.0",
+  "description": "Real-time AI Agent Orchestration System",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "cd server && npm run dev",
+    "test-agents": "node test-agents/simple-agent.js"
+  },
+  "keywords": ["ai", "orchestration", "websocket", "agents"],
+  "author": "Triumph Kia Teh",
+  "license": "MIT",
+  "type": "commonjs"
+}

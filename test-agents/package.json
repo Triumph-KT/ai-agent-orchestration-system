@@ -1,0 +1,13 @@
+{
+  "name": "test-agents",
+  "version": "1.0.0",
+  "description": "Test agents for AI orchestration system",
+  "main": "simple-agent.js",
+  "scripts": {
+    "start": "node simple-agent.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.2"
+  },
+  "type": "commonjs"
+}
