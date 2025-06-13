@@ -2,7 +2,7 @@
 
 /**
  * AI Agent Orchestration Server
- * @version 1.3.0 - Added task result persistence to file
+ * @version 1.4.1 - Finalized portable logging path.
  */
 
 const express = require('express');
@@ -11,16 +11,22 @@ const http = require('http');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
-const fs = require('fs'); // Import the File System module
+const fs = require('fs');
+const path = require('path');
 
 const AgentManager = require('./agentManager');
 const TaskQueue = require('./taskQueue');
 
 class AIOrchestrationServer {
-    // ... constructor and other functions remain the same ...
     constructor(port = 8080) {
         this.port = port;
         this.routerUrl = 'http://router:5001/route';
+        this.logPath = './logs'; // The log directory, relative to the container's working directory
+        this.logFile = path.join(this.logPath, 'task_outputs.jsonl');
+
+        // On startup, ensure the log directory exists inside the container
+        fs.mkdirSync(this.logPath, { recursive: true });
+        
         this.app = express();
         this.server = http.createServer(this.app);
         this.wss = new WebSocket.Server({ server: this.server });
@@ -36,7 +42,7 @@ class AIOrchestrationServer {
     setupMiddleware() {
         this.app.use(cors());
         this.app.use(express.json());
-        this.app.use(express.static('../dashboard'));
+        this.app.use(express.static('dashboard'));
     }
     
     setupWebSocketHandlers() {
@@ -92,9 +98,9 @@ class AIOrchestrationServer {
         console.log(`Task ${data.taskId} completed by agent ${data.agentId}`);
         this.taskQueue.completeTask(data.taskId, data.result);
 
-        // NEW: Persist the result to a log file
         const logEntry = { taskId: data.taskId, result: data.result, timestamp: new Date().toISOString() };
-        fs.appendFile('../task_outputs.jsonl', JSON.stringify(logEntry) + '\n', (err) => {
+        // Use the corrected log file path
+        fs.appendFile(this.logFile, JSON.stringify(logEntry) + '\n', (err) => {
             if (err) console.error('Failed to write task output to file:', err);
         });
         

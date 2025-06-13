@@ -1,26 +1,19 @@
-# Specifies the version of the Docker Compose file format
 version: '3.8'
 
-# Defines the services (containers) that make up our application
 services:
-
-  # The Python ML Router Service
-  # We name it 'router', which is the hostname the Node.js server will use to find it.
   router:
-    # Tells Docker Compose to build the image from the Dockerfile in the './ml-router' directory
     build: ./ml-router
-    # We can still map the port to our host machine for direct testing if needed
     ports:
       - "5001:5001"
 
-  # The Node.js Orchestration Server
   orchestrator:
-    # Build the image from the Dockerfile in the './server' directory
     build: ./server
-    # Map port 8080 on our host machine to port 8080 in the container, so we can access the UI
     ports:
       - "8080:8080"
-    # Tells Docker Compose that the 'orchestrator' depends on the 'router'.
-    # This ensures the router service is started before the orchestrator service begins.
     depends_on:
       - router
+    volumes:
+      # Links the dashboard for the UI
+      - ./dashboard:/usr/src/app/dashboard
+      # NEW: Links the entire local logs directory into the container
+      - ./logs:/usr/src/app/logs

@@ -11,6 +11,9 @@ __pycache__/
 *.log
 npm-debug.log*
 
+# Ignore log files
+logs/
+
 # Data Outputs
 task_outputs.jsonl
 
