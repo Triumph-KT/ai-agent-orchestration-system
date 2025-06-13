@@ -22,3 +22,7 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Jupyter artifacts
+.ipynb_checkpoints/
+.virtual_documents/
