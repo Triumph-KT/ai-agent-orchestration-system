@@ -36,87 +36,33 @@
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 16px;
         }
-        header h1 {
-            margin: 0;
-            font-size: 24px;
-        }
-        .connection-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-        }
-        .status-light {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background-color: var(--red);
-            transition: background-color 0.3s ease;
-        }
-        .status-light.connected {
-            background-color: var(--green);
-        }
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 24px;
-        }
-        .metric-card {
-            background-color: var(--card-bg);
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-        .metric-card h3 {
-            margin: 0 0 8px;
-            font-size: 14px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-        .metric-card p {
-            margin: 0;
-            font-size: 32px;
-            font-weight: 600;
-        }
-        .card {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            padding: 16px;
-        }
-        .card h2 {
-            margin-top: 0;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 14px;
-            white-space: nowrap;
-        }
-        th {
-            color: var(--text-muted);
-        }
-        .capabilities-cell {
-            white-space: normal;
-        }
-        .status {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: capitalize;
-        }
+        header h1 { margin: 0; font-size: 24px; }
+        .connection-status { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .status-light { width: 12px; height: 12px; border-radius: 50%; background-color: var(--red); transition: background-color 0.3s ease; }
+        .status-light.connected { background-color: var(--green); }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 24px; }
+        .metric-card { background-color: var(--card-bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .metric-card h3 { margin: 0 0 8px; font-size: 14px; color: var(--text-muted); text-transform: uppercase; }
+        .metric-card p { margin: 0; font-size: 32px; font-weight: 600; }
+        .card { background-color: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color); padding: 16px; }
+        .card h2 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 14px; white-space: nowrap; }
+        th { color: var(--text-muted); }
+        .capabilities-cell { white-space: normal; }
+        .status { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: capitalize; }
         .status-idle { background-color: var(--green); color: white; }
         .status-busy { background-color: var(--orange); color: var(--bg-color); }
         .status-offline { background-color: var(--red); color: white; }
+        .grid-2-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 8px; font-weight: 600; color: var(--text-muted); }
+        .form-group select, .form-group textarea { background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; color: var(--text-color); font-family: inherit; font-size: 14px; }
+        .form-group textarea { resize: vertical; min-height: 120px; }
+        .submit-btn { background-color: var(--accent-color); color: white; border: none; padding: 12px 16px; border-radius: 4px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .submit-btn:hover { background-color: #4338ca; }
+        .submit-btn:disabled { background-color: var(--border-color); cursor: not-allowed; }
+        #task-output { background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 16px; min-height: 158px; white-space: pre-wrap; word-wrap: break-word; color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -130,40 +76,34 @@
         </header>
 
         <div class="metrics-grid">
-            <div class="metric-card">
-                <h3>Total Agents</h3>
-                <p id="metric-total-agents">0</p>
+            <div class="metric-card"><h3>Total Agents</h3><p id="metric-total-agents">0</p></div>
+            <div class="metric-card"><h3>Idle Agents</h3><p id="metric-idle-agents">0</p></div>
+            <div class="metric-card"><h3>Busy Agents</h3><p id="metric-busy-agents">0</p></div>
+            <div class="metric-card"><h3>Pending Tasks</h3><p id="metric-pending-tasks">0</p></div>
+            <div class="metric-card"><h3>Completed Tasks</h3><p id="metric-completed-tasks">0</p></div>
+        </div>
+
+        <div class="grid-2-col">
+            <div class="card">
+                <h2>Submit a New Task</h2>
+                <form id="task-form">
+                    <div class="form-group"><label for="task-type">Task Type</label><select id="task-type" name="task-type"><option value="text_processing">Text Processing</option><option value="code_generation">Code Generation</option><option value="data_analysis">Data Analysis</option></select></div>
+                    <div class="form-group"><label for="task-payload">Task Details / Prompt</label><textarea id="task-payload" placeholder="e.g., Explain quantum computing in simple terms"></textarea></div>
+                    <br>
+                    <button type="submit" class="submit-btn" id="submit-button">Submit Task</button>
+                </form>
             </div>
-            <div class="metric-card">
-                <h3>Idle Agents</h3>
-                <p id="metric-idle-agents">0</p>
-            </div>
-            <div class="metric-card">
-                <h3>Busy Agents</h3>
-                <p id="metric-busy-agents">0</p>
-            </div>
-            <div class="metric-card">
-                <h3>Pending Tasks</h3>
-                <p id="metric-pending-tasks">0</p>
-            </div>
-            <div class="metric-card">
-                <h3>Completed Tasks</h3>
-                <p id="metric-completed-tasks">0</p>
+            <div class="card">
+                <h2>Task Output</h2>
+                <div id="task-output">Awaiting task submission...</div>
             </div>
         </div>
 
         <div class="card">
             <h2>Live Agent Status</h2>
             <table id="agent-table">
-                <thead>
-                    <tr>
-                        <th>Agent ID</th>
-                        <th>Status</th>
-                        <th>Capabilities</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
+                <thead><tr><th>Agent ID</th><th>Status</th><th>Capabilities</th></tr></thead>
+                <tbody></tbody>
             </table>
         </div>
     </div>
@@ -173,21 +113,24 @@
             const statusLight = document.getElementById('status-light');
             const statusText = document.getElementById('status-text');
             const agentTableBody = document.querySelector('#agent-table tbody');
-
             const metricTotalAgents = document.getElementById('metric-total-agents');
             const metricIdleAgents = document.getElementById('metric-idle-agents');
             const metricBusyAgents = document.getElementById('metric-busy-agents');
             const metricPendingTasks = document.getElementById('metric-pending-tasks');
             const metricCompletedTasks = document.getElementById('metric-completed-tasks');
+            const taskForm = document.getElementById('task-form');
+            const taskTypeSelect = document.getElementById('task-type');
+            const taskPayloadInput = document.getElementById('task-payload');
+            const taskOutputDiv = document.getElementById('task-output');
+            const submitButton = document.getElementById('submit-button');
             
             const serverUrl = 'ws://localhost:8080';
             let ws;
+            let submittedTaskId = null;
 
             function connect() {
                 ws = new WebSocket(serverUrl);
-
                 ws.onopen = () => {
-                    console.log('Connected to orchestration server');
                     statusLight.classList.add('connected');
                     statusText.textContent = 'Connected';
                     ws.send(JSON.stringify({ type: 'dashboard_connect' }));
@@ -195,27 +138,30 @@
 
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'dashboard_init' || data.type === 'stats_update') {
-                        updateDashboard(data);
+                    switch(data.type) {
+                        case 'stats_update':
+                            updateDashboard(data);
+                            break;
+                        case 'task_completed':
+                            if (data.taskId === submittedTaskId) {
+                                displayTaskResult(data.result);
+                            }
+                            break;
                     }
                 };
 
                 ws.onclose = () => {
-                    console.log('Disconnected from server. Reconnecting in 3 seconds...');
                     statusLight.classList.remove('connected');
                     statusText.textContent = 'Disconnected';
                     setTimeout(connect, 3000);
                 };
-
                 ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
                     statusText.textContent = 'Error';
                     ws.close();
                 };
             }
 
             function updateDashboard(data) {
-                // Update metric cards
                 if (data.agents) {
                     metricTotalAgents.textContent = data.agents.total || 0;
                     metricIdleAgents.textContent = data.agents.idle || 0;
@@ -225,47 +171,74 @@
                     metricPendingTasks.textContent = data.tasks.pending || 0;
                     metricCompletedTasks.textContent = data.tasks.completed || 0;
                 }
-                
-                // NEW LOGIC: Update agent table from the live list
                 if (data.agentList) {
                     updateAgentTable(data.agentList);
-                } else if (data.type === 'dashboard_init' && data.agents) {
-                    // Fallback for the very first message
-                    updateAgentTable(data.agents);
                 }
             }
 
             function updateAgentTable(agents) {
                 agentTableBody.innerHTML = '';
-                
                 if (!agents || agents.length === 0) {
                     const row = agentTableBody.insertRow();
-                    const cell = row.insertCell();
-                    cell.colSpan = 3;
-                    cell.textContent = 'No agents connected.';
-                    cell.style.textAlign = 'center';
-                    cell.style.color = 'var(--text-muted)';
+                    row.insertCell().colSpan = 3;
+                    row.cells[0].textContent = 'No agents connected.';
+                    row.cells[0].style.textAlign = 'center';
                     return;
                 }
-
                 agents.forEach(agent => {
                     const row = agentTableBody.insertRow();
-                    
-                    const idCell = row.insertCell();
-                    idCell.textContent = agent.id.substring(0, 8);
-
+                    row.insertCell().textContent = agent.id.substring(0, 8);
                     const statusCell = row.insertCell();
                     const statusSpan = document.createElement('span');
                     statusSpan.className = `status status-${agent.status}`;
                     statusSpan.textContent = agent.status;
                     statusCell.appendChild(statusSpan);
-
-                    const capsCell = row.insertCell();
-                    capsCell.className = 'capabilities-cell';
-                    capsCell.textContent = agent.capabilities.join(', ');
+                    row.insertCell().textContent = agent.capabilities.join(', ');
                 });
             }
             
+            taskForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const taskType = taskTypeSelect.value;
+                const payloadText = taskPayloadInput.value;
+                if (!payloadText.trim()) return;
+
+                const payload = (taskType === 'code_generation' || taskType === 'data_analysis') ? { description: payloadText } : { text: payloadText };
+                
+                submitButton.disabled = true;
+                taskOutputDiv.textContent = 'Task submitted. Awaiting assignment...';
+                taskOutputDiv.style.color = 'var(--text-muted)';
+                
+                try {
+                    const response = await fetch('http://localhost:8080/api/tasks', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: taskType, payload })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        submittedTaskId = data.taskId;
+                        taskOutputDiv.textContent = `Task (${submittedTaskId.substring(0,8)}...) is processing.`;
+                    } else {
+                        displayTaskResult({ success: false, error: 'Failed to submit task to server.' });
+                    }
+                } catch (error) {
+                    displayTaskResult({ success: false, error: 'Could not connect to server API.' });
+                }
+            });
+
+            function displayTaskResult(result) {
+                if (result.success) {
+                    taskOutputDiv.textContent = result.output;
+                    taskOutputDiv.style.color = 'var(--text-color)';
+                } else {
+                    taskOutputDiv.textContent = `Error: ${result.error || 'An unknown error occurred.'}`;
+                    taskOutputDiv.style.color = 'var(--red)';
+                }
+                submitButton.disabled = false;
+                taskPayloadInput.value = '';
+            }
+
             connect();
         });
     </script>
