@@ -86,11 +86,13 @@
 
     <script>
         /**
-         * This script is for the monitoring dashboard.
-         * It connects to the orchestrator and displays real-time system-wide statistics.
+         * @file This script powers the Monitoring Dashboard.
+         * @description It establishes a WebSocket connection to the orchestration server
+         * and listens for 'stats_update' events to render a real-time view of the
+         * entire system's health and agent status.
          */
         document.addEventListener('DOMContentLoaded', () => {
-            // Get references to all the elements we need to update
+            // Get references to all the DOM elements we will need to update.
             const statusLight = document.getElementById('status-light');
             const statusText = document.getElementById('status-text');
             const agentTableBody = document.querySelector('#agent-table tbody');
@@ -103,7 +105,10 @@
             const serverUrl = 'ws://localhost:8080';
             let ws;
 
-            // Function to establish and manage the WebSocket connection
+            /**
+             * Establishes and manages the WebSocket connection, including event handlers
+             * for open, message, close, and error events, with auto-reconnection logic.
+             */
             function connect() {
                 ws = new WebSocket(serverUrl);
 
@@ -111,13 +116,13 @@
                     console.log('Monitoring client connected to orchestration server.');
                     statusLight.classList.add('connected');
                     statusText.textContent = 'Connected';
-                    // Identify this client as a dashboard to receive broadcasted stats
+                    // Identify this client as a dashboard to receive broadcasted stats.
                     ws.send(JSON.stringify({ type: 'dashboard_connect' }));
                 };
 
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
-                    // This client only cares about stats_update messages
+                    // This monitoring client only needs to process 'stats_update' messages.
                     if (data.type === 'stats_update') {
                         updateDashboard(data);
                     }
@@ -127,7 +132,8 @@
                     console.log('Monitoring client disconnected. Reconnecting in 3 seconds...');
                     statusLight.classList.remove('connected');
                     statusText.textContent = 'Disconnected';
-                    setTimeout(connect, 3000); // Attempt to reconnect
+                    // Automatically attempt to reconnect if the connection is lost.
+                    setTimeout(connect, 3000);
                 };
 
                 ws.onerror = (error) => {
@@ -137,9 +143,13 @@
                 };
             }
 
-            // Function to update all the metric cards on the dashboard
+            /**
+             * Main UI update function. It receives the full stats payload from the server
+             * and delegates the data to the appropriate rendering functions.
+             * @param {object} data - The stats object from the server's broadcast.
+             */
             function updateDashboard(data) {
-                // Update the top metric cards
+                // Update the top metric cards with the latest counts.
                 if (data.agents) {
                     metricTotalAgents.textContent = data.agents.total || 0;
                     metricIdleAgents.textContent = data.agents.idle || 0;
@@ -149,15 +159,18 @@
                     metricPendingTasks.textContent = data.tasks.pending || 0;
                     metricCompletedTasks.textContent = data.tasks.completed || 0;
                 }
-                // Update the live agent table
+                // Update the live agent table with the full list of agents.
                 if (data.agentList) {
                     updateAgentTable(data.agentList);
                 }
             }
 
-            // Function to redraw the agent status table
+            /**
+             * Completely redraws the agent status table with fresh data from the server.
+             * @param {object[]} agents - An array of agent objects.
+             */
             function updateAgentTable(agents) {
-                // Clear any existing rows
+                // Clear all existing rows to prevent duplication.
                 agentTableBody.innerHTML = '';
                 
                 if (!agents || agents.length === 0) {
@@ -168,11 +181,11 @@
                     return;
                 }
 
-                // Create a new row for each connected agent
+                // Create a new table row for each agent in the system.
                 agents.forEach(agent => {
                     const row = agentTableBody.insertRow();
                     
-                    row.insertCell().textContent = agent.id.substring(0, 8); // Shortened ID
+                    row.insertCell().textContent = agent.id.substring(0, 8);
                     
                     const statusCell = row.insertCell();
                     const statusSpan = document.createElement('span');
@@ -184,7 +197,7 @@
                 });
             }
             
-            // Initiate the connection when the page loads
+            // Initiate the WebSocket connection when the page loads.
             connect();
         });
     </script>

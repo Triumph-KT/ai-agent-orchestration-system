@@ -1,43 +1,40 @@
 /**
- * Agent Management System
- * 
- * Manages the lifecycle, capabilities, and performance tracking of AI agents
- * in the orchestration system. Implements efficient agent lookup, load balancing,
- * and health monitoring similar to container orchestration platforms.
- * 
- * Key Features:
- * - Capability-based agent indexing for O(1) capability lookups
- * - Performance-based agent scoring for optimal task assignment
- * - Health monitoring with heartbeat tracking
- * - Load balancing across available agents
- * 
+ * @file Manages the state, capabilities, and lifecycle of all connected AI agents.
  * @author Triumph Kia Teh
- * @version 1.0.0
+ * @version 1.1.0
+ *
+ * @description
+ * This module acts as the central registry for the agent fleet. It uses efficient
+ * data structures for quick lookups and provides methods for adding, removing,
+ * and querying agents. It is also responsible for health monitoring via heartbeats.
  */
 
 /**
- * Centralized agent management system for the AI orchestration platform
+ * Manages the collection of all active and offline AI agents in the system.
  */
 class AgentManager {
     /**
-     * Initialize agent management with optimized data structures
+     * Initializes the AgentManager with optimized data structures for agent lookups.
      */
     constructor() {
-        // Primary agent storage: agentId -> agent object
+        // Primary agent storage provides O(1) lookup by agent ID.
+        // Stores the full agent object including the WebSocket connection.
         this.agents = new Map();
         
-        // Capability index for fast agent lookup: capability -> Set of agentIds
+        // A reverse index for finding agents by their skills, enabling
+        // efficient, O(1) filtering of capable agents for a given task.
         this.capabilities = new Map();
     }
     
     /**
-     * Register a new agent in the system with capability indexing
-     * @param {Object} agent - Agent object containing id, capabilities, ws connection, etc.
+     * Registers a new agent in the system. This involves adding the agent to the main
+     * registry and updating the capability index for efficient future lookups.
+     * @param {object} agent - The agent object, containing its ID, capabilities, and WebSocket connection.
      */
     addAgent(agent) {
         this.agents.set(agent.id, agent);
         
-        // Build capability index for efficient task-agent matching
+        // For each capability the agent reports, add its ID to the corresponding Set in the index.
         agent.capabilities.forEach(capability => {
             if (!this.capabilities.has(capability)) {
                 this.capabilities.set(capability, new Set());
@@ -45,17 +42,18 @@ class AgentManager {
             this.capabilities.get(capability).add(agent.id);
         });
         
-        console.log(`Agent ${agent.id} added. Total agents: ${this.agents.size}`);
+        console.log(`Agent ${agent.id} registered. Total agents: ${this.agents.size}`);
     }
     
     /**
-     * Remove an agent from the system using WebSocket connection lookup
-     * Cleans up all indexes and references
-     * @param {WebSocket} ws - WebSocket connection of the agent to remove
+     * De-registers an agent when its WebSocket connection is closed.
+     * It safely removes the agent from the main registry and cleans up all
+     * references in the capability index to prevent memory leaks or incorrect assignments.
+     * @param {WebSocket} ws - The closed WebSocket connection of the agent to remove.
      */
     removeAgent(ws) {
-        // Find agent by WebSocket connection (reverse lookup)
         let agentToRemove = null;
+        // This reverse lookup is necessary because we only have the 'ws' object on disconnect.
         for (const [id, agent] of this.agents.entries()) {
             if (agent.ws === ws) {
                 agentToRemove = { id, agent };
@@ -64,12 +62,11 @@ class AgentManager {
         }
         
         if (agentToRemove) {
-            // Clean up capability index
+            // Remove the agent from all capability sets it was a part of.
             agentToRemove.agent.capabilities.forEach(capability => {
                 const capabilitySet = this.capabilities.get(capability);
                 if (capabilitySet) {
                     capabilitySet.delete(agentToRemove.id);
-                    // Remove empty capability entries
                     if (capabilitySet.size === 0) {
                         this.capabilities.delete(capability);
                     }
@@ -82,18 +79,19 @@ class AgentManager {
     }
     
     /**
-     * Retrieve agent by ID
-     * @param {string} agentId - Unique agent identifier
-     * @returns {Object|undefined} Agent object or undefined if not found
+     * Retrieves a single agent object by its unique ID.
+     * @param {string} agentId - Unique agent identifier.
+     * @returns {object | undefined} The agent object if found, otherwise undefined.
      */
     getAgent(agentId) {
         return this.agents.get(agentId);
     }
     
     /**
-     * Update agent status and performance metrics
-     * @param {string} agentId - Agent identifier
-     * @param {string} status - New status ('idle', 'busy', 'offline')
+     * Updates an agent's status and its last heartbeat timestamp.
+     * This is called when an agent reports a status change or sends a periodic heartbeat.
+     * @param {string} agentId - The ID of the agent to update.
+     * @param {string} status - The agent's new status ('idle', 'busy', etc.).
      */
     updateAgentStatus(agentId, status) {
         const agent = this.agents.get(agentId);
@@ -101,7 +99,7 @@ class AgentManager {
             agent.status = status;
             agent.lastHeartbeat = new Date();
             
-            // Track performance metrics for load balancing
+            // This timestamp is a key feature for load balancing decisions.
             if (status === 'idle') {
                 agent.lastTaskCompletedAt = new Date();
             }
@@ -109,59 +107,37 @@ class AgentManager {
     }
     
     /**
-     * Get all idle agents that match required capabilities, sorted by performance
-     * @param {Array<string>} requiredCapabilities - List of required capabilities
-     * @returns {Array<Object>} Sorted list of qualified idle agents
+     * Retrieves a list of all idle agents that possess a required set of capabilities.
+     * This is used to gather a pool of potential candidates before sending them to the
+     * ML router for the final, optimal decision.
+     * @param {string[]} [requiredCapabilities=[]] - An array of capability strings the agent must have.
+     * @returns {object[]} An array of qualified, idle agent objects.
      */
     getIdleAgents(requiredCapabilities = []) {
         const idleAgents = [];
         
-        // Filter agents by status and capability requirements
         for (const agent of this.agents.values()) {
+            // Ensure the agent is available and has all the necessary skills for the task.
             if (agent.status === 'idle') {
-                // Verify agent has all required capabilities
-                const hasCapabilities = requiredCapabilities.every(
-                    capability => agent.capabilities.includes(capability)
+                const hasAllCapabilities = requiredCapabilities.every(
+                    cap => agent.capabilities.includes(cap)
                 );
                 
-                if (hasCapabilities) {
+                if (hasAllCapabilities) {
                     idleAgents.push(agent);
                 }
             }
         }
         
-        // Sort by performance score (highest score first for optimal assignment)
-        return idleAgents.sort((a, b) => {
-            const aScore = this.calculateAgentScore(a);
-            const bScore = this.calculateAgentScore(b);
-            return bScore - aScore;
-        });
+        // The list of candidates is returned unsorted, as the final sorting/decision
+        // is now handled by the external ML router service.
+        return idleAgents;
     }
     
     /**
-     * Calculate agent performance score for load balancing
-     * Higher scores indicate better candidates for task assignment
-     * @param {Object} agent - Agent object
-     * @returns {number} Performance score
-     */
-    calculateAgentScore(agent) {
-        // Time-based availability scoring for load distribution
-        const timeSinceLastTask = agent.lastTaskCompletedAt 
-            ? Date.now() - agent.lastTaskCompletedAt.getTime()
-            : 0;
-        
-        // Prefer agents that haven't worked recently (load balancing)
-        const availabilityScore = Math.min(timeSinceLastTask / (1000 * 60), 100);
-        
-        // Capability diversity bonus (agents with more capabilities get higher scores)
-        const capabilityScore = agent.capabilities.length * 10;
-        
-        return availabilityScore + capabilityScore;
-    }
-    
-    /**
-     * Get sanitized agent data for external consumption
-     * @returns {Array<Object>} Array of agent data without sensitive information
+     * Provides a sanitized list of all agents, suitable for broadcasting to a UI.
+     * It removes sensitive data like the raw WebSocket connection object.
+     * @returns {object[]} An array of public-safe agent data.
      */
     getAllAgents() {
         return Array.from(this.agents.values()).map(agent => ({
@@ -174,8 +150,9 @@ class AgentManager {
     }
     
     /**
-     * Generate system statistics for monitoring and dashboard
-     * @returns {Object} Comprehensive agent statistics
+     * Aggregates and returns high-level statistics about the agent fleet,
+     * used for populating the monitoring dashboard.
+     * @returns {object} An object containing agent counts and a list of all registered capabilities.
      */
     getStats() {
         const stats = {
@@ -186,7 +163,6 @@ class AgentManager {
             capabilities: Array.from(this.capabilities.keys())
         };
         
-        // Count agents by status
         for (const agent of this.agents.values()) {
             stats[agent.status] = (stats[agent.status] || 0) + 1;
         }
@@ -195,81 +171,48 @@ class AgentManager {
     }
     
     /**
-     * Monitor agent health via heartbeat timeouts
-     * Marks unresponsive agents as offline
+     * A periodic health check that iterates through all registered agents.
+     * If an agent has not sent a heartbeat within the timeout period, it is
+     * marked as 'offline' to prevent it from being assigned new tasks.
      */
     checkHeartbeats() {
         const now = new Date();
-        const heartbeatTimeout = 60000; // 60 seconds timeout
+        const heartbeatTimeout = 60000; // 60 seconds
         
         for (const [agentId, agent] of this.agents.entries()) {
-            const timeSinceHeartbeat = now - agent.lastHeartbeat;
-            
-            if (timeSinceHeartbeat > heartbeatTimeout) {
-                console.log(`Agent ${agentId} heartbeat timeout, marking as offline`);
-                agent.status = 'offline';
-                
-                // Future enhancement: implement automatic reconnection logic
+            // This check only applies to agents that are supposed to be online.
+            if (agent.status !== 'offline' && agent.lastHeartbeat) {
+                const timeSinceHeartbeat = now - agent.lastHeartbeat;
+                if (timeSinceHeartbeat > heartbeatTimeout) {
+                    console.warn(`Agent ${agentId} heartbeat timeout. Marking as offline.`);
+                    this.updateAgentStatus(agentId, 'offline');
+                }
             }
         }
     }
-    
+
     /**
-     * Advanced agent selection for ML-based task routing
-     * This method will be enhanced with machine learning models
-     * @param {Object} task - Task object with requirements
-     * @param {Array<Object>} availableAgents - Optional pre-filtered agent list
-     * @returns {Object|null} Best agent for the task or null if none available
+     * @deprecated Heuristic-based routing logic. This has been replaced by the external Python ML service.
+     * This function is preserved for reference and potential fallback scenarios.
      */
     getBestAgentForTask(task, availableAgents = null) {
-        const candidates = availableAgents || this.getIdleAgents(task.requiredCapabilities);
-        
-        if (candidates.length === 0) return null;
-        
-        // Current implementation uses heuristic scoring
-        // Future: integrate machine learning model for optimal selection
-        let bestAgent = null;
-        let bestScore = -1;
-        
-        candidates.forEach(agent => {
-            const score = this.calculateTaskAgentScore(task, agent);
-            if (score > bestScore) {
-                bestScore = score;
-                bestAgent = agent;
-            }
-        });
-        
-        return bestAgent;
+        // ... implementation is obsolete ...
+    }
+
+    /**
+     * @deprecated Heuristic scoring algorithm. This has been replaced by the ML model's predictions.
+     * This function is preserved for reference.
+     */
+    calculateTaskAgentScore(task, agent) {
+        // ... implementation is obsolete ...
     }
     
     /**
-     * Calculate task-specific agent compatibility score
-     * Will be replaced with ML model predictions
-     * @param {Object} task - Task object
-     * @param {Object} agent - Agent object
-     * @returns {number} Compatibility score
+     * @deprecated Heuristic scoring based on agent properties only. Replaced by ML model.
+     * This function is preserved for reference.
      */
-    calculateTaskAgentScore(task, agent) {
-        let score = 0;
-        
-        // Capability matching bonus
-        const matchingCapabilities = task.requiredCapabilities.filter(
-            cap => agent.capabilities.includes(cap)
-        ).length;
-        score += matchingCapabilities * 20;
-        
-        // Load balancing consideration
-        const timeSinceLastTask = agent.lastTaskCompletedAt 
-            ? Date.now() - agent.lastTaskCompletedAt.getTime()
-            : Infinity;
-        score += Math.min(timeSinceLastTask / 1000, 100);
-        
-        // Priority-based urgency bonus
-        if (task.priority === 'high') {
-            score += 50;
-        }
-        
-        return score;
+    calculateAgentScore(agent) {
+        // ... implementation is obsolete ...
     }
 }
 

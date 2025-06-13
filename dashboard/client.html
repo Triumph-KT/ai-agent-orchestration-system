@@ -52,10 +52,6 @@
         .output-block:first-child { padding-top: 0; }
         .output-block:last-child { border-bottom: none; padding-bottom: 0; }
         .output-block p { margin: 0; }
-        .prompt-text { font-weight: 600; }
-        .result-text { white-space: pre-wrap; word-wrap: break-word; color: var(--text-color); margin-top: 8px !important; }
-        .processing-text { color: var(--text-muted); font-style: italic; }
-        .error-text { color: var(--red); }
         .prompt-text {
             color: var(--text-muted);
             font-weight: 600;
@@ -64,7 +60,12 @@
         .result-text {
             color: var(--text-color);
             line-height: 1.6;
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
+            margin-top: 8px !important;
         }
+        .processing-text { color: var(--text-muted); font-style: italic; }
+        .error-text { color: var(--red); }
     </style>
 </head>
 <body>
@@ -101,8 +102,9 @@
 
     <script>
         /**
-         * Final Client UI Script
-         * v2.1.0 - Fixes the output history bug.
+         * @file This script powers the entire user-facing client interface.
+         * @description It handles form submissions via REST API and listens for real-time
+         * results via WebSockets to create a responsive, interactive experience.
          */
         document.addEventListener('DOMContentLoaded', () => {
             // --- Element Selectors ---
@@ -115,25 +117,45 @@
             // --- State Management ---
             const serverUrl = 'ws://localhost:8080';
             let ws;
-            let taskHistory = {}; // Maps task IDs to the UI elements that should display their results
-            let isFirstSubmission = true; // NEW: Flag to track if we've submitted the first task
+            // This object is crucial for linking a submitted task to its UI element.
+            // When a task is submitted, we create a UI block with a temporary ID.
+            // When the server confirms submission, we swap the temp ID for the real taskId.
+            // When the WebSocket sends a 'task_completed' event, we use the real taskId
+            // to find the correct UI element in this map and update it.
+            let taskHistory = {};
+            let isFirstSubmission = true;
 
-            // --- WebSocket Connection ---
+            /**
+             * Establishes and manages the WebSocket connection to the server,
+             * including reconnection logic. Its primary role is to listen for
+             * 'task_completed' events.
+             */
             function connect() {
                 ws = new WebSocket(serverUrl);
-                ws.onopen = () => ws.send(JSON.stringify({ type: 'dashboard_connect' }));
-                ws.onclose = () => setTimeout(connect, 3000);
-                ws.onerror = (error) => ws.close();
+
+                ws.onopen = () => {
+                    // This client also identifies as a 'dashboard' type so it can receive broadcasts.
+                    ws.send(JSON.stringify({ type: 'dashboard_connect' }));
+                };
                 
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
+                    // The client UI only cares about results for tasks it has submitted.
                     if (data.type === 'task_completed' && taskHistory[data.taskId]) {
                         displayTaskResult(data.taskId, data.result);
                     }
                 };
+
+                ws.onclose = () => setTimeout(connect, 3000);
+                ws.onerror = (error) => ws.close();
             }
 
-            // --- Event Listener for Form Submission ---
+            /**
+             * Handles the form submission event. This function orchestrates the entire
+             * user-facing workflow: creating an optimistic UI update, submitting the
+             * task to the server via a REST API call, and preparing the UI to
+             * receive the final result via WebSocket.
+             */
             taskForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const taskType = taskTypeSelect.value;
@@ -143,11 +165,12 @@
                 const payload = (taskType === 'code_generation' || taskType === 'data_analysis') ? { description: payloadText } : { text: payloadText };
                 submitButton.disabled = true;
 
-                // Create a placeholder in the UI for the new task
+                // Create a temporary ID to track the UI element before we get the real taskId from the server.
                 const tempId = `temp_${Date.now()}`;
                 createOutputBlock(tempId, payloadText); 
 
                 try {
+                    // Asynchronously send the new task to the server's REST endpoint.
                     const response = await fetch('http://localhost:8080/api/tasks', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -157,11 +180,10 @@
 
                     if (data.success) {
                         const realTaskId = data.taskId;
-                        // Link the real task ID to our temporary UI block
+                        // Swap the temporary ID in our map with the real ID from the server.
                         const resultElement = taskHistory[tempId];
                         delete taskHistory[tempId];
                         taskHistory[realTaskId] = resultElement;
-                        resultElement.parentElement.dataset.taskId = realTaskId;
                     } else {
                         displayTaskResult(tempId, { success: false, error: 'Failed to submit task to server.' });
                     }
@@ -170,11 +192,14 @@
                 }
             });
 
-            // --- UI Update Functions ---
-
-            // MODIFIED: Creates a block for a question and its eventual answer
+            /**
+             * Creates a new "chat bubble" in the output history, showing the user's
+             * prompt and a "Processing..." placeholder.
+             * @param {string} id - The temporary ID for the new task block.
+             * @param {string} prompt - The user's prompt text.
+             */
             function createOutputBlock(id, prompt) {
-                // FIX: Only clear the div on the very first submission
+                // On the very first submission, clear the initial "Awaiting..." message.
                 if (isFirstSubmission) {
                     taskOutputDiv.innerHTML = ''; 
                     isFirstSubmission = false;
@@ -193,12 +218,17 @@
                 
                 block.appendChild(promptEl);
                 block.appendChild(resultEl);
-                taskOutputDiv.prepend(block); // Add new block to the top
+                taskOutputDiv.prepend(block); // Adds the new block to the top of the history.
 
-                taskHistory[id] = resultEl;
+                taskHistory[id] = resultEl; // Map the ID to the element that will show the result.
             }
 
-            // Updates the correct block with the final result
+            /**
+             * Finds the correct output block using its taskId and populates it with
+             * the final result from the GPT-4 agent.
+             * @param {string} taskId - The unique ID of the completed task.
+             * @param {object} result - The result object from the server.
+             */
             function displayTaskResult(taskId, result) {
                 const resultEl = taskHistory[taskId];
                 if (!resultEl) return;
@@ -210,11 +240,14 @@
                     resultEl.textContent = `Error: ${result.error || 'An unknown error occurred.'}`;
                     resultEl.className = 'error-text';
                 }
+                
+                // Clean up and reset the form for the next submission.
                 delete taskHistory[taskId];
                 submitButton.disabled = false;
                 taskPayloadInput.value = '';
             }
 
+            // Initial connection to the server when the page loads.
             connect();
         });
     </script>

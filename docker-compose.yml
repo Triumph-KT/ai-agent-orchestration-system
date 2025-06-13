@@ -1,19 +1,48 @@
+# Docker Compose file for the AI Agent Orchestration System.
+# This file defines and configures the multi-container application, allowing the
+# entire backend (both Node.js and Python services) to be launched with a single command.
+#
+# To run: docker-compose up --build
+
+# The version attribute is for older versions of Docker Compose but is kept for compatibility.
 version: '3.8'
 
+# The 'services' key is the main section where each microservice (container) is defined.
 services:
+
+  # --- The Python ML Router Service ---
+  # This service is responsible for making intelligent routing decisions.
+  # We name it 'router', which is the hostname the Node.js server will use to find it.
   router:
+    # Tells Docker Compose to build the image from the Dockerfile 
+    # located in the './ml-router' directory.
     build: ./ml-router
+    # Maps port 5001 on the host machine to port 5001 inside the container.
+    # This isn't required for inter-container communication but is useful for direct debugging.
     ports:
       - "5001:5001"
 
+  # --- The Node.js Orchestration Server ---
+  # This is the core service that manages agents, tasks, and WebSocket communication.
   orchestrator:
+    # Build the image from the Dockerfile in the './server' directory.
     build: ./server
+    # Map port 8080 on the host to port 8080 in the container. This is essential
+    # for accessing the web UIs (client.html, dashboard.html) from your browser.
     ports:
       - "8080:8080"
+    # This crucial directive ensures that the 'router' container is started *before*
+    # the 'orchestrator' container begins, preventing race conditions on startup.
     depends_on:
       - router
+    # Volumes create a link between a directory on the host machine and a directory
+    # inside the container. This is powerful for development and data persistence.
     volumes:
-      # Links the dashboard for the UI
+      # Links our local './dashboard' folder to '/usr/src/app/dashboard' inside the container.
+      # This allows the Node.js server to serve the latest version of the UI files.
+      # It also enables live changes to the UI without rebuilding the container.
       - ./dashboard:/usr/src/app/dashboard
-      # NEW: Links the entire local logs directory into the container
+      # Links our local './logs' folder to '/usr/src/app/logs' inside the container.
+      # This ensures that any log files created by the server *inside* the container
+      # are actually written to your local machine, so they are not lost when the container stops.
       - ./logs:/usr/src/app/logs
