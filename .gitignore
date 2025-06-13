@@ -11,6 +11,9 @@ __pycache__/
 *.log
 npm-debug.log*
 
+# Data Outputs
+task_outputs.jsonl
+
 # Database
 *.db
 *.sqlite

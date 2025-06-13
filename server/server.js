@@ -2,7 +2,7 @@
 
 /**
  * AI Agent Orchestration Server
- * @version 1.2.1 - Bugfix for broadcast function call
+ * @version 1.3.0 - Added task result persistence to file
  */
 
 const express = require('express');
@@ -11,11 +11,13 @@ const http = require('http');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
+const fs = require('fs'); // Import the File System module
 
 const AgentManager = require('./agentManager');
 const TaskQueue = require('./taskQueue');
 
 class AIOrchestrationServer {
+    // ... constructor and other functions remain the same ...
     constructor(port = 8080) {
         this.port = port;
         this.routerUrl = 'http://127.0.0.1:5001/route';
@@ -34,7 +36,7 @@ class AIOrchestrationServer {
     setupMiddleware() {
         this.app.use(cors());
         this.app.use(express.json());
-        this.app.use(express.static('../dashboard')); // Serve dashboard from parent directory
+        this.app.use(express.static('../dashboard'));
     }
     
     setupWebSocketHandlers() {
@@ -66,7 +68,6 @@ class AIOrchestrationServer {
                 break;
             case 'dashboard_connect':
                 ws.isDashboard = true;
-                // CORRECTED FUNCTION CALL
                 this.broadcastToDashboards({ type: 'stats_update', agents: this.agentManager.getStats(), agentList: this.agentManager.getAllAgents(), tasks: this.taskQueue.getStats() }, ws);
                 break;
         }
@@ -90,8 +91,13 @@ class AIOrchestrationServer {
     async handleTaskResult(data) {
         console.log(`Task ${data.taskId} completed by agent ${data.agentId}`);
         this.taskQueue.completeTask(data.taskId, data.result);
+
+        // NEW: Persist the result to a log file
+        const logEntry = { taskId: data.taskId, result: data.result, timestamp: new Date().toISOString() };
+        fs.appendFile('../task_outputs.jsonl', JSON.stringify(logEntry) + '\n', (err) => {
+            if (err) console.error('Failed to write task output to file:', err);
+        });
         
-        // CORRECTED FUNCTION CALL
         this.broadcastToDashboards({
             type: 'task_completed',
             taskId: data.taskId,
