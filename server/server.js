@@ -20,7 +20,7 @@ class AIOrchestrationServer {
     // ... constructor and other functions remain the same ...
     constructor(port = 8080) {
         this.port = port;
-        this.routerUrl = 'http://127.0.0.1:5001/route';
+        this.routerUrl = 'http://router:5001/route';
         this.app = express();
         this.server = http.createServer(this.app);
         this.wss = new WebSocket.Server({ server: this.server });
