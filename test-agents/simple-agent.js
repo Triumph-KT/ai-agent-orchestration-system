@@ -112,7 +112,7 @@ class GPTAgent {
         const completion = await openai.chat.completions.create({
             model: "gpt-4",
             messages: [{ role: "system", content: system_prompt }, { role: "user", content: user_prompt }],
-            max_tokens: 150,
+            max_tokens: 300,
         });
 
         const gptResponse = completion.choices[0].message.content;

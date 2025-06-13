@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Agent Orchestrator - Dashboard</title>
+    <title>AI Orchestrator - Monitoring Dashboard</title>
     <style>
         :root {
             --bg-color: #1a1a1b;
@@ -54,21 +54,12 @@
         .status-idle { background-color: var(--green); color: white; }
         .status-busy { background-color: var(--orange); color: var(--bg-color); }
         .status-offline { background-color: var(--red); color: white; }
-        .grid-2-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-        .form-group { display: flex; flex-direction: column; }
-        .form-group label { margin-bottom: 8px; font-weight: 600; color: var(--text-muted); }
-        .form-group select, .form-group textarea { background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; color: var(--text-color); font-family: inherit; font-size: 14px; }
-        .form-group textarea { resize: vertical; min-height: 120px; }
-        .submit-btn { background-color: var(--accent-color); color: white; border: none; padding: 12px 16px; border-radius: 4px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-        .submit-btn:hover { background-color: #4338ca; }
-        .submit-btn:disabled { background-color: var(--border-color); cursor: not-allowed; }
-        #task-output { background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 16px; min-height: 158px; white-space: pre-wrap; word-wrap: break-word; color: var(--text-muted); }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Orchestrator Dashboard</h1>
+            <h1>Orchestrator Monitoring</h1>
             <div class="connection-status">
                 <div id="status-light" class="status-light"></div>
                 <span id="status-text">Connecting...</span>
@@ -83,33 +74,23 @@
             <div class="metric-card"><h3>Completed Tasks</h3><p id="metric-completed-tasks">0</p></div>
         </div>
 
-        <div class="grid-2-col">
-            <div class="card">
-                <h2>Submit a New Task</h2>
-                <form id="task-form">
-                    <div class="form-group"><label for="task-type">Task Type</label><select id="task-type" name="task-type"><option value="text_processing">Text Processing</option><option value="code_generation">Code Generation</option><option value="data_analysis">Data Analysis</option></select></div>
-                    <div class="form-group"><label for="task-payload">Task Details / Prompt</label><textarea id="task-payload" placeholder="e.g., Explain quantum computing in simple terms"></textarea></div>
-                    <br>
-                    <button type="submit" class="submit-btn" id="submit-button">Submit Task</button>
-                </form>
-            </div>
-            <div class="card">
-                <h2>Task Output</h2>
-                <div id="task-output">Awaiting task submission...</div>
-            </div>
-        </div>
-
         <div class="card">
             <h2>Live Agent Status</h2>
             <table id="agent-table">
                 <thead><tr><th>Agent ID</th><th>Status</th><th>Capabilities</th></tr></thead>
-                <tbody></tbody>
+                <tbody>
+                    </tbody>
             </table>
         </div>
     </div>
 
     <script>
+        /**
+         * This script is for the monitoring dashboard.
+         * It connects to the orchestrator and displays real-time system-wide statistics.
+         */
         document.addEventListener('DOMContentLoaded', () => {
+            // Get references to all the elements we need to update
             const statusLight = document.getElementById('status-light');
             const statusText = document.getElementById('status-text');
             const agentTableBody = document.querySelector('#agent-table tbody');
@@ -118,50 +99,47 @@
             const metricBusyAgents = document.getElementById('metric-busy-agents');
             const metricPendingTasks = document.getElementById('metric-pending-tasks');
             const metricCompletedTasks = document.getElementById('metric-completed-tasks');
-            const taskForm = document.getElementById('task-form');
-            const taskTypeSelect = document.getElementById('task-type');
-            const taskPayloadInput = document.getElementById('task-payload');
-            const taskOutputDiv = document.getElementById('task-output');
-            const submitButton = document.getElementById('submit-button');
             
             const serverUrl = 'ws://localhost:8080';
             let ws;
-            let submittedTaskId = null;
 
+            // Function to establish and manage the WebSocket connection
             function connect() {
                 ws = new WebSocket(serverUrl);
+
                 ws.onopen = () => {
+                    console.log('Monitoring client connected to orchestration server.');
                     statusLight.classList.add('connected');
                     statusText.textContent = 'Connected';
+                    // Identify this client as a dashboard to receive broadcasted stats
                     ws.send(JSON.stringify({ type: 'dashboard_connect' }));
                 };
 
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
-                    switch(data.type) {
-                        case 'stats_update':
-                            updateDashboard(data);
-                            break;
-                        case 'task_completed':
-                            if (data.taskId === submittedTaskId) {
-                                displayTaskResult(data.result);
-                            }
-                            break;
+                    // This client only cares about stats_update messages
+                    if (data.type === 'stats_update') {
+                        updateDashboard(data);
                     }
                 };
 
                 ws.onclose = () => {
+                    console.log('Monitoring client disconnected. Reconnecting in 3 seconds...');
                     statusLight.classList.remove('connected');
                     statusText.textContent = 'Disconnected';
-                    setTimeout(connect, 3000);
+                    setTimeout(connect, 3000); // Attempt to reconnect
                 };
+
                 ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
                     statusText.textContent = 'Error';
                     ws.close();
                 };
             }
 
+            // Function to update all the metric cards on the dashboard
             function updateDashboard(data) {
+                // Update the top metric cards
                 if (data.agents) {
                     metricTotalAgents.textContent = data.agents.total || 0;
                     metricIdleAgents.textContent = data.agents.idle || 0;
@@ -171,13 +149,17 @@
                     metricPendingTasks.textContent = data.tasks.pending || 0;
                     metricCompletedTasks.textContent = data.tasks.completed || 0;
                 }
+                // Update the live agent table
                 if (data.agentList) {
                     updateAgentTable(data.agentList);
                 }
             }
 
+            // Function to redraw the agent status table
             function updateAgentTable(agents) {
+                // Clear any existing rows
                 agentTableBody.innerHTML = '';
+                
                 if (!agents || agents.length === 0) {
                     const row = agentTableBody.insertRow();
                     row.insertCell().colSpan = 3;
@@ -185,60 +167,24 @@
                     row.cells[0].style.textAlign = 'center';
                     return;
                 }
+
+                // Create a new row for each connected agent
                 agents.forEach(agent => {
                     const row = agentTableBody.insertRow();
-                    row.insertCell().textContent = agent.id.substring(0, 8);
+                    
+                    row.insertCell().textContent = agent.id.substring(0, 8); // Shortened ID
+                    
                     const statusCell = row.insertCell();
                     const statusSpan = document.createElement('span');
                     statusSpan.className = `status status-${agent.status}`;
                     statusSpan.textContent = agent.status;
                     statusCell.appendChild(statusSpan);
+                    
                     row.insertCell().textContent = agent.capabilities.join(', ');
                 });
             }
             
-            taskForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const taskType = taskTypeSelect.value;
-                const payloadText = taskPayloadInput.value;
-                if (!payloadText.trim()) return;
-
-                const payload = (taskType === 'code_generation' || taskType === 'data_analysis') ? { description: payloadText } : { text: payloadText };
-                
-                submitButton.disabled = true;
-                taskOutputDiv.textContent = 'Task submitted. Awaiting assignment...';
-                taskOutputDiv.style.color = 'var(--text-muted)';
-                
-                try {
-                    const response = await fetch('http://localhost:8080/api/tasks', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ type: taskType, payload })
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                        submittedTaskId = data.taskId;
-                        taskOutputDiv.textContent = `Task (${submittedTaskId.substring(0,8)}...) is processing.`;
-                    } else {
-                        displayTaskResult({ success: false, error: 'Failed to submit task to server.' });
-                    }
-                } catch (error) {
-                    displayTaskResult({ success: false, error: 'Could not connect to server API.' });
-                }
-            });
-
-            function displayTaskResult(result) {
-                if (result.success) {
-                    taskOutputDiv.textContent = result.output;
-                    taskOutputDiv.style.color = 'var(--text-color)';
-                } else {
-                    taskOutputDiv.textContent = `Error: ${result.error || 'An unknown error occurred.'}`;
-                    taskOutputDiv.style.color = 'var(--red)';
-                }
-                submitButton.disabled = false;
-                taskPayloadInput.value = '';
-            }
-
+            // Initiate the connection when the page loads
             connect();
         });
     </script>
