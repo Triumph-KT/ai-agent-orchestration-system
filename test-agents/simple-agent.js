@@ -1,16 +1,17 @@
+// test-agents/simple-agent.js
+
 /**
- * AI Agent (GPT-4 Powered)
- * * Simulates AI agents for the orchestration system by processing tasks using
- * real calls to the OpenAI GPT-4 API.
+ * AI Agent (GPT-4 Powered with Heartbeat)
+ * * Processes tasks using real GPT-4 API calls and maintains a persistent
+ * heartbeat to prevent timeouts during long-running operations.
  * * @author Triumph Kia Teh
- * @version 2.0.0
+ * @version 2.1.0
  */
 
-require('dotenv').config(); // Loads environment variables from .env file
+require('dotenv').config();
 const WebSocket = require('ws');
 const OpenAI = require('openai');
 
-// Initialize the OpenAI client with the API key from the .env file
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
@@ -22,6 +23,8 @@ class GPTAgent {
         this.serverUrl = serverUrl;
         this.ws = null;
         this.isRegistered = false;
+        this.status = 'connecting'; // Add status property
+        this.heartbeatInterval = null; // To hold our interval
     }
     
     connect() {
@@ -30,8 +33,31 @@ class GPTAgent {
 
         this.ws.on('open', () => this.register());
         this.ws.on('message', (data) => this.handleMessage(JSON.parse(data)));
-        this.ws.on('close', () => console.log(`Agent ${this.agentId} disconnected.`));
-        this.ws.on('error', (error) => console.error(`Agent ${this.agentId} error:`, error));
+        this.ws.on('close', () => {
+            console.log(`Agent ${this.agentId} disconnected.`);
+            this.stopHeartbeat(); // Stop heartbeat on close
+        });
+        this.ws.on('error', (error) => {
+            console.error(`Agent ${this.agentId} error:`, error);
+            this.stopHeartbeat(); // Stop heartbeat on error
+        });
+    }
+
+    // NEW: Starts the heartbeat interval
+    startHeartbeat() {
+        console.log(`Agent ${this.agentId} starting heartbeat.`);
+        this.stopHeartbeat(); // Ensure no multiple heartbeats are running
+        this.heartbeatInterval = setInterval(() => {
+            this.reportStatus(this.status);
+        }, 15000); // Send status every 15 seconds
+    }
+
+    // NEW: Stops the heartbeat interval
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
     }
     
     register() {
@@ -47,6 +73,7 @@ class GPTAgent {
                 this.isRegistered = true;
                 console.log(`Agent ${this.agentId} successfully registered.`);
                 this.reportStatus('idle');
+                this.startHeartbeat(); // Start the heartbeat AFTER successful registration
                 break;
             case 'task_assignment':
                 this.handleTaskAssignment(message.task);
@@ -59,7 +86,6 @@ class GPTAgent {
         this.reportStatus('busy');
         
         try {
-            // This now calls the REAL GPT-4 API
             const result = await this.processTaskWithGPT4(task);
             this.reportTaskCompletion(task.id, result);
         } catch (error) {
@@ -69,15 +95,9 @@ class GPTAgent {
         }
     }
 
-    /**
-     * Generates a prompt and processes the task using the GPT-4 API.
-     * @param {Object} task - The task to process.
-     * @returns {Object} The result from GPT-4.
-     */
     async processTaskWithGPT4(task) {
         console.log(`Agent ${this.agentId} sending task to GPT-4...`);
         
-        // 1. Create a prompt based on the task type and payload
         let system_prompt = `You are a specialized AI agent. Your capabilities are: ${this.capabilities.join(', ')}.`;
         let user_prompt = `Perform the task of type '${task.type}'. Task details: ${JSON.stringify(task.payload)}`;
 
@@ -89,27 +109,19 @@ class GPTAgent {
             user_prompt = `Provide a brief analysis of the following data: ${JSON.stringify(task.payload)}`;
         }
 
-        // 2. Call the OpenAI API
         const completion = await openai.chat.completions.create({
             model: "gpt-4",
-            messages: [
-                { role: "system", content: system_prompt },
-                { role: "user", content: user_prompt },
-            ],
+            messages: [{ role: "system", content: system_prompt }, { role: "user", content: user_prompt }],
             max_tokens: 150,
         });
 
         const gptResponse = completion.choices[0].message.content;
         console.log(`Agent ${this.agentId} received response from GPT-4.`);
 
-        // 3. Format the result
         return {
             success: true,
             output: gptResponse,
-            metadata: {
-                modelUsed: 'gpt-4',
-                finish_reason: completion.choices[0].finish_reason,
-            }
+            metadata: { modelUsed: 'gpt-4', finish_reason: completion.choices[0].finish_reason }
         };
     }
     
@@ -120,8 +132,9 @@ class GPTAgent {
     }
     
     reportStatus(status) {
+        this.status = status; // Update internal status
         if (!this.isRegistered) return;
-        this.send({ type: 'agent_status', agentId: this.agentId, status });
+        this.send({ type: 'agent_status', agentId: this.agentId, status: this.status });
     }
     
     send(message) {
@@ -134,9 +147,9 @@ class GPTAgent {
 // --- Agent Fleet Initialization ---
 if (require.main === module) {
     const agents = [
-        new GPTAgent('agent-1', ['text_processing', 'data_analysis']),
-        new GPTAgent('agent-2', ['code_generation', 'text_processing']),
-        new GPTAgent('agent-3', ['image_analysis', 'data_analysis'])
+        new GPTAgent('gpt-agent-1', ['text_processing', 'data_analysis']),
+        new GPTAgent('gpt-agent-2', ['code_generation', 'text_processing']),
+        new GPTAgent('gpt-agent-3', ['image_analysis', 'data_analysis'])
     ];
     
     agents.forEach(agent => agent.connect());
