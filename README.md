@@ -8,6 +8,14 @@ A full-stack, containerized application demonstrating a real-time, distributed s
 
 ---
 
+## 🎥 Live Demo
+
+A complete walkthrough of the system, from submitting tasks via the UI to stress-testing the containerized backend.
+
+**[Watch the Full Demo on YouTube]**[AI-Ochestrator-System-YouTube](https://youtu.be/kqTNjzzjrQw)
+
+---
+
 ## Key Components
 
 * **Orchestration Server (Node.js/Express):** The central "nervous" system, managing agent connections, a priority task queue, and system state via WebSockets.
